@@ -1,6 +1,5 @@
 """
 gives back the edges of G' = neutral edges + short edges.
-
 """
 function gprime_edges(state::GameState)::Vector{Edge}
     filter(e -> e.state == :neutral || e.state == :short, state.graph.edges)
@@ -8,7 +7,6 @@ end
 
 """
 BFS : gives back the nodes reachable from `src` using `edges`.
-
 """
 function bfs_visited(edges::Vector{Edge}, src::Vertex)::Set{Int}
     visited = Set{Int}([src.id])
@@ -28,7 +26,6 @@ end
 
 """
 BFS : gives back a path from `s` to `t` using `edges`, or nothing if no path exists.
-
 """
 function bfs_path(edges::Vector{Edge}, s::Vertex, t::Vertex)::Union{Vector{Edge}, Nothing}
     prev = Dict{Int, Union{Edge,Nothing}}(s.id => nothing)
@@ -56,7 +53,6 @@ end
 
 """
 Calculate a spanning tree (BFS) on `edges` starting from `src`.
-
 """
 function spanning_tree(edges::Vector{Edge}, src::Vertex)::Vector{Edge}
     visited = Set{Int}([src.id])
@@ -78,7 +74,6 @@ end
 
 """
 Search for two spanning trees At, Bt in G' with disjoint neutral edges 
-
 """
 function find_two_spanning_trees(state::GameState)
     gp  = gprime_edges(state)
@@ -99,24 +94,35 @@ end
 
 """
 Search for two cut sets At, Bt in G' with disjoint neutral edges.
-
 """
 function find_two_cut_sets(state::GameState)
-    gp  = gprime_edges(state)
+    gp   = gprime_edges(state)
     s, t = state.graph.s, state.graph.t
 
-    p1 = bfs_path(gp, s, t)
-    p1 === nothing && return nothing
-    At = filter(e -> e.state == :neutral, p1)
+    # G' should contain a s-t path 
+    !(t.id in bfs_visited(gp, s)) && return nothing
 
-    At_ids = Set(e.id for e in At)
-    gp2 = filter(e -> !(e.id in At_ids), gp)  # removes neutral edges of At
+    # Co-tree 1 :
+    T1     = spanning_tree(gp, s)
+    T1_ids = Set(e.id for e in T1)
+    # At = arêtes de G' hors T1 (= co-arbre 1)
+    At = filter(e -> !(e.id in T1_ids), gp)
 
-    p2 = bfs_path(gp2, s, t)
-    p2 === nothing && return nothing
-    Bt = filter(e -> e.state == :neutral, p2)
+    # co-tree 2 :
+    # should not contain the neutral edges of At (otherwise they can't be removed by Cut)
+    At_neutral_ids = Set(e.id for e in At if e.state == :neutral)
+    t2_pool = filter(e -> !(e.id in At_neutral_ids), gp)
 
-    isempty(Bt) && return nothing
+    !(t.id in bfs_visited(t2_pool, s)) && return nothing
+
+    T2     = spanning_tree(t2_pool, s)
+    T2_ids = Set(e.id for e in T2)
+    # Bt = edges of t2_pool not in T2 (= co-tree 2)
+    Bt = filter(e -> !(e.id in T2_ids), t2_pool)
+
+    # Verify that Bt contains at least one neutral edge (otherwise Cut cannot remove anything)
+    isempty(filter(e -> e.state == :neutral, Bt)) && return nothing
+
     return At, Bt
 end
 
