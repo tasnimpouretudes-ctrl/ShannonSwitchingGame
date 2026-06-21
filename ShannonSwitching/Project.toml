@@ -2,3 +2,15 @@ name = "ShannonSwitching"
 uuid = "ba310ae5-c3f6-4a3b-80ad-ef49cf71239d"
 version = "0.1.0"
 authors = ["DELL"]
+
+[deps]
+Cairo = "159f3aea-2a34-519c-b102-8c37f9878175"
+Gtk4 = "9db2cae5-386f-4011-9d63-a5602296539b"
+GtkObservables = "8710efd8-4ad6-11eb-33ea-2d5ceb25a41c"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+
+[compat]
+Cairo = "1.1.1"
+Gtk4 = "0.7.12"
+GtkObservables = "2.2.2"
+Random = "1.11.0"
