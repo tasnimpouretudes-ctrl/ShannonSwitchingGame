@@ -25,7 +25,7 @@ function new_game(g::GameGraph)::GameState
     for i in g.edges 
         i.state = :neutral
     end 
-    return GameState(graph = g ,current_player = :short ,history=Vector{Tuple{Symbol, Edge}}(),winner = nothing  )
+    return GameState( g ,:short ,Vector{Tuple{Symbol, Edge}}(), nothing  )
 end 
 
 function valid_moves(state::GameState)::Vector{Edge}
@@ -141,25 +141,26 @@ function  random_graph(n::Int, m::Int; weighted=false)::GameGraph
                 end
             end 
         end 
-        if m >n-1
-            
-            for s in n:m
-                # Fix duplikats ohne selfloops und selfloops ohne duplikats 
-                # slefloop : (4,4)  duplikat: kante (5,2) schone exitiert und wir werden 
-                # (5,2) nochmal als kante erstellen  
-                c = shuffle(e)
-                c_1 = pop!(c)
-                c_2 = pop!(c)
-                if weighted === false 
-                    push!(e,Edge(s,c_1.u,c_2.v,1,:neutral))
-                else 
-                    push!(e,Edge(s,c_1.u,c_2.v,rand(1:10),:neutral))
+        if m > n-1
+            ex = Set{Tuple{Int,Int}}()
+            for edge in e
+                push!(ex, (min(edge.u.id, edge.v.id), max(edge.u.id, edge.v.id)))
+            end
+    
+            s = n
+            while s <= m
+                r = shuffle(ve)
+                a = pop!(r)
+                b = pop!(r)
+                k = (min(a.id, b.id), max(a.id, b.id))
+                if k ∉ ex
+                    push!(ex, key)
+                    w = weighted ? rand(1:10) : 1
+                    push!(e, Edge(s, a, b, w, :neutral))
+                    s += 1
                 end
-            
-            
-            end 
-            
-        end 
+            end
+        end
 
 
 
