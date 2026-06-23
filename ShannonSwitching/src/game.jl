@@ -154,7 +154,7 @@ function  random_graph(n::Int, m::Int; weighted=false)::GameGraph
                 b = pop!(r)
                 k = (min(a.id, b.id), max(a.id, b.id))
                 if k ∉ ex
-                    push!(ex, key)
+                    push!(ex, k)
                     w = weighted ? rand(1:10) : 1
                     push!(e, Edge(s, a, b, w, :neutral))
                     s += 1
