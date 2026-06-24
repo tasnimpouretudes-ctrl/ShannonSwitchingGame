@@ -280,7 +280,7 @@ end
 
 
 # Hilfsfunktion : Calculate the shorted virtual path s-t with Djkstra 
-short-edges = 0.0, Neutral-edges = weight, Cut-edges = Inf
+#short-edges = 0.0, Neutral-edges = weight, Cut-edges = Inf
 function find_best_virtual_path(state::GameState)
     graph = state.graph
     s_id = graph.s.id
