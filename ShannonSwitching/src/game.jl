@@ -111,6 +111,20 @@ function make_move!(state::GameState, e::Edge)::Nothing
 end
 
 function  random_graph(n::Int, m::Int; weighted=false)::GameGraph
+    n = rand(4:10)
+    lm =[n-1]
+    i = 5 
+
+    while i!=0
+        f = rand(1:6)
+        push!(lm,n+f)
+        i-=1
+    end 
+    m = rand(lm)
+
+
+
+
     if m < n-1 
         return error("Diese Graph ist nicht zusammenhanged ")
     else 
@@ -154,7 +168,7 @@ function  random_graph(n::Int, m::Int; weighted=false)::GameGraph
                 b = pop!(r)
                 k = (min(a.id, b.id), max(a.id, b.id))
                 if k ∉ ex
-                    push!(ex, key)
+                    push!(ex, k)
                     w = weighted ? rand(1:10) : 1
                     push!(e, Edge(s, a, b, w, :neutral))
                     s += 1

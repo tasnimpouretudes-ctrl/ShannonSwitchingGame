@@ -2,7 +2,8 @@ using Gtk4
 using Cairo
 using GtkObservables
 using Random
-
+include("game.jl")
+include("strategies.jl")
 const CANVAS_SIZE = 400
 const NODE_RADIUS = 20
 

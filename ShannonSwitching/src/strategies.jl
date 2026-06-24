@@ -275,17 +275,111 @@ end
 
 
 
+# Idea : Virtuel Disktra + take from the best path the edge with the minimal cost 
 
 
 
-
-
-
-
-function weighted_short(state)
-    error("Weighted short strategy not implemented yet")
+# Hilfsfunktion : Calculate the shorted virtual path s-t with Djkstra 
+short-edges = 0.0, Neutral-edges = weight, Cut-edges = Inf
+function find_best_virtual_path(state::GameState)
+    graph = state.graph
+    s_id = graph.s.id
+    t_id = graph.t.id
+    
+    # Initialisation des distances et des prédécesseurs (indexés par ID de Vertex)
+    max_vertex_id = maximum(v.id for v in graph.vertices)
+    dist = fill(Inf, max_vertex_id)
+    parent_edge = Dict{Int, Edge}()
+    dist[s_id] = 0.0
+    
+    # Liste d'adjacence construite manuellement pour l'efficacité
+    adj = Dict{Int, Vector{Tuple{Int, Edge}}}()
+    for v in graph.vertices
+        adj[v.id] = []
+    end
+    
+    for edge in graph.edges
+        edge.state == :cut && continue # On ignore les arêtes coupées
+        
+        # Poids virtuel : 0 si déjà acquis par Short, sinon son poids réel
+        v_weight = (edge.state == :short) ? 0.0 : edge.weight
+        
+        push!(adj[edge.u.id], (edge.v.id, edge))
+        push!(adj[edge.v.id], (edge.u.id, edge))
+    end
+    
+    # File de priorité simplifiée (recherche du min non visité)
+    visited = Set{Int}()
+    
+    while true
+        # Trouver le nœud non visité avec la distance minimale
+        u_id = -1
+        min_d = Inf
+        for v in graph.vertices
+            if !(v.id in visited) && dist[v.id] < min_d
+                u_id = v.id
+                min_d = dist[v.id]
+            end
+        end
+        
+        (u_id == -1 || u_id == t_id) && break
+        push!(visited, u_id)
+        
+        for (neighbor_id, edge) in adj[u_id]
+            neighbor_id in visited && continue
+            v_weight = (edge.state == :short) ? 0.0 : edge.weight
+            new_d = dist[u_id] + v_weight
+            if new_d < dist[neighbor_id]
+                dist[neighbor_id] = new_d
+                parent_edge[neighbor_id] = edge
+            end
+        end
+    end
+    
+    # Si aucun chemin n'existe, retourner une liste vide
+    dist[t_id] == Inf && return Edge[]
+    
+    # Reconstruire le chemin d'arêtes de t vers s
+    path = Edge[]
+    curr_id = t_id
+    while curr_id != s_id && haskey(parent_edge, curr_id)
+        edge = parent_edge[curr_id]
+        push!(path, edge)
+        curr_id = (edge.u.id == curr_id) ? edge.v.id : edge.u.id
+    end
+    
+    return path
 end
 
-function weighted_cut(state)
-    error("Weighted cut strategy not implemented yet")
+# --- Short weighted Strategy ---
+function weighted_short(state::GameState)::Edge
+    path = find_best_virtual_path(state)
+    
+    # Extraire uniquement les arêtes encore neutres sur ce chemin idéal
+    neutral_on_path = filter(e -> e.state == :neutral, path)
+    
+    if !isempty(neutral_on_path)
+        # Stratégie : Sécuriser l'arête la moins chère du chemin pour verrouiller le gain
+        return sort(neutral_on_path, by = e -> e.weight)[1]
+    else
+        # Fallback : Si aucun chemin complet n'est visible, prendre l'arête neutre globale la moins chère
+        all_neutral = filter(e -> e.state == :neutral, state.graph.edges)
+        return sort(all_neutral, by = e -> e.weight)[1]
+    end
+end
+
+# --- Cut weighted Strategy ---
+function weighted_cut(state::GameState)::Edge
+    path = find_best_virtual_path(state)
+    
+    neutral_on_path = filter(e -> e.state == :neutral, path)
+    
+    if !isempty(neutral_on_path)
+        # Stratégie : Saboter le plan de Short en lui coupant l'arête la moins chère de son chemin
+        return sort(neutral_on_path, by = e -> e.weight)[1]
+    else
+        # Fallback : Si Short n'a déjà plus de chemin, couper n'importe quelle arête neutre restante
+        all_neutral = filter(e -> e.state == :neutral, state.graph.edges)
+        return sort(all_neutral, by = e -> e.weight)[1]
+    end
 end
