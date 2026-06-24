@@ -10,30 +10,36 @@ const NODE_RADIUS = 20
 # FONCTIONS DE DESSIN
 # ============================================
 
-function draw_vertex(ctx, x, y, label)
-    # Cercle gris
-    set_source_rgb(ctx, 0.85, 0.85, 0.85)
+function draw_vertex(ctx, x, y, label, color=:gray)
+    if color == :green
+        set_source_rgb(ctx, 0.0, 0.8, 0.0)
+    elseif color == :orange
+        set_source_rgb(ctx, 1.0, 0.5, 0.0)
+    else
+        set_source_rgb(ctx, 0.85, 0.85, 0.85)
+    end
+
     arc(ctx, x, y, NODE_RADIUS, 0, 2pi)
     fill(ctx)
 
-    # Contour noir
     set_source_rgb(ctx, 0.0, 0.0, 0.0)
     set_line_width(ctx, 2.0)
     arc(ctx, x, y, NODE_RADIUS, 0, 2pi)
     stroke(ctx)
 
-    # Le nom du noeud (s, a, b, t...)
-    move_to(ctx, x - 5, y + 5)
+    set_source_rgb(ctx, 1.0, 1.0, 1.0)
+    set_font_size(ctx, 16.0)
+    move_to(ctx, x - 5, y + 6)
     show_text(ctx, label)
 end
 
 function draw_edge(ctx, x1, y1, x2, y2, state)
     if state == :neutral
-        set_source_rgb(ctx, 0.6, 0.6, 0.6)   # gris
+        set_source_rgb(ctx, 0.6, 0.6, 0.6)
     elseif state == :short
-        set_source_rgb(ctx, 0.0, 0.0, 1.0)   # bleu
+        set_source_rgb(ctx, 0.0, 0.0, 1.0)
     elseif state == :cut
-        set_source_rgb(ctx, 1.0, 0.0, 0.0)   # rouge
+        set_source_rgb(ctx, 1.0, 0.0, 0.0)
     end
 
     set_line_width(ctx, 3.0)
@@ -45,12 +51,14 @@ end
 function compute_positions(graph::GameGraph)
     n = length(graph.vertices)
     positions = Dict{Int, Tuple{Float64,Float64}}()
-    
+
     center_x, center_y = CANVAS_SIZE / 2, CANVAS_SIZE / 2
     radius = CANVAS_SIZE / 2 - 50
 
+    angles = shuffle(collect(0:n-1)) .* (2π / n)
+
     for (i, v) in enumerate(graph.vertices)
-        angle = 2π * (i - 1) / n
+        angle = angles[i]
         x = center_x + radius * cos(angle)
         y = center_y + radius * sin(angle)
         positions[v.id] = (x, y)
@@ -59,8 +67,7 @@ function compute_positions(graph::GameGraph)
     return positions
 end
 
-function draw_graph(ctx, state::GameState, positions::Dict)
-    # Fond blanc
+function draw_graph(ctx, state::GameState, positions::Dict, is_weighted::Bool=false)
     set_source_rgb(ctx, 1.0, 1.0, 1.0)
     paint(ctx)
 
@@ -69,13 +76,28 @@ function draw_graph(ctx, state::GameState, positions::Dict)
         x1, y1 = positions[e.u.id]
         x2, y2 = positions[e.v.id]
         draw_edge(ctx, x1, y1, x2, y2, e.state)
+
+        # Afficher le poids si mode weighted
+        if is_weighted
+            mx = (x1 + x2) / 2
+            my = (y1 + y2) / 2
+            set_source_rgb(ctx, 0.0, 0.0, 0.0)
+            set_font_size(ctx, 12.0)
+            move_to(ctx, mx, my)
+            show_text(ctx, string(round(e.weight, digits=1)))
+        end
     end
 
     # 2. Dessiner tous les noeuds par-dessus
     for v in state.graph.vertices
         x, y = positions[v.id]
-        label = string(v.id)
-        draw_vertex(ctx, x, y, label)
+        if v === state.graph.s
+            draw_vertex(ctx, x, y, "s", :green)
+        elseif v === state.graph.t
+            draw_vertex(ctx, x, y, "t", :orange)
+        else
+            draw_vertex(ctx, x, y, string(v.id))
+        end
     end
 end
 
@@ -98,10 +120,10 @@ end
 
 function find_closest_edge(state::GameState, positions::Dict, click_x, click_y)
     best_edge = nothing
-    best_distance = 15.0  # tolérance en pixels
+    best_distance = 15.0
 
     for e in state.graph.edges
-        e.state != :neutral && continue  # on ignore les arêtes déjà jouées
+        e.state != :neutral && continue
 
         x1, y1 = positions[e.u.id]
         x2, y2 = positions[e.v.id]
@@ -135,56 +157,63 @@ end
 # ============================================
 
 function run_game()
-    # Graphe aléatoire (6 noeuds, 8 arêtes)
-    graph = random_graph(6, 5)
+    # Les arguments n et m sont ignorés, random_graph les choisit aléatoirement
+    function new_graph_and_positions(is_weighted::Bool)
+        g = random_graph(0, 0, weighted=is_weighted)
+        pos = compute_positions(g)
+        return g, pos
+    end
 
-    # Positions calculées automatiquement
-    positions = compute_positions(graph)
+    graph_ref = Ref(random_graph(0, 0))
+    positions_ref = Ref(compute_positions(graph_ref[]))
+    state_obs = Observable(new_game(graph_ref[]))
 
-    state_obs = Observable(new_game(graph))
-
-    win = GtkWindow("Shannon-Switching Game", CANVAS_SIZE, CANVAS_SIZE + 80)
+    win = GtkWindow("Shannon-Switching Game", CANVAS_SIZE, CANVAS_SIZE + 110)
     vbox = GtkBox(:v)
     label = GtkLabel(status_string(state_obs[]))
     canvas = GtkCanvas(CANVAS_SIZE, CANVAS_SIZE)
+    weighted_check = GtkCheckButton("Weighted")
     btn = GtkButton("New Game")
 
     push!(win, vbox)
     push!(vbox, label)
     push!(vbox, canvas)
+    push!(vbox, weighted_check)
     push!(vbox, btn)
 
     show(win)
 
-    # Dessine le graphe quand l'état change
     @guarded draw(canvas) do widget
         ctx = getgc(widget)
-        draw_graph(ctx, state_obs[], positions)
+        is_weighted = Gtk4.G_.get_active(weighted_check)
+        draw_graph(ctx, state_obs[], positions_ref[], is_weighted)
     end
 
-    # Met à jour le label quand l'état change
     on(state_obs) do state
         Gtk4.G_.set_label(label, status_string(state))
         draw(canvas)
     end
 
-    # Gère les clics sur le plateau
     click = GtkGestureClick()
     push!(canvas, click)
     signal_connect(click, "pressed") do _ctrl, _n_press, x, y
         state = state_obs[]
         !isnothing(state.winner) && return
 
-        clicked_edge = find_closest_edge(state, positions, x, y)
+        clicked_edge = find_closest_edge(state, positions_ref[], x, y)
         isnothing(clicked_edge) && return
 
         make_move!(state, clicked_edge)
         notify(state_obs)
     end
 
-    # Gère le bouton New Game
     signal_connect(btn, "clicked") do _
-        state_obs[] = new_game(graph)
+        is_weighted = Gtk4.G_.get_active(weighted_check)
+        new_g, new_pos = new_graph_and_positions(is_weighted)
+        graph_ref[] = new_g
+        positions_ref[] = new_pos
+        state_obs[] = new_game(new_g)
+        notify(state_obs)
     end
 
     Gtk4.start_main_loop()
