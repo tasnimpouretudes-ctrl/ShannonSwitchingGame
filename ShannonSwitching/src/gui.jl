@@ -2,10 +2,10 @@ using Gtk4
 using Cairo
 using GtkObservables
 using Random
-include("game.jl")
-include("strategies.jl")
+
 const CANVAS_SIZE = 400
 const NODE_RADIUS = 20
+const PANEL_WIDTH = 150
 
 # ============================================
 # FONCTIONS DE DESSIN
@@ -68,7 +68,7 @@ function compute_positions(graph::GameGraph)
     return positions
 end
 
-function draw_graph(ctx, state::GameState, positions::Dict, is_weighted::Bool=false)
+function draw_graph(ctx, state::GameState, positions::Dict)
     set_source_rgb(ctx, 1.0, 1.0, 1.0)
     paint(ctx)
 
@@ -77,16 +77,6 @@ function draw_graph(ctx, state::GameState, positions::Dict, is_weighted::Bool=fa
         x1, y1 = positions[e.u.id]
         x2, y2 = positions[e.v.id]
         draw_edge(ctx, x1, y1, x2, y2, e.state)
-
-        # Afficher le poids si mode weighted
-        if is_weighted
-            mx = (x1 + x2) / 2
-            my = (y1 + y2) / 2
-            set_source_rgb(ctx, 0.0, 0.0, 0.0)
-            set_font_size(ctx, 12.0)
-            move_to(ctx, mx, my)
-            show_text(ctx, string(round(e.weight, digits=1)))
-        end
     end
 
     # 2. Dessiner tous les noeuds par-dessus
@@ -140,7 +130,7 @@ function find_closest_edge(state::GameState, positions::Dict, click_x, click_y)
 end
 
 # ============================================
-# AFFICHAGE DU STATUT
+# AFFICHAGE DU STATUT ET DES POIDS
 # ============================================
 
 function status_string(state::GameState)::String
@@ -151,6 +141,14 @@ function status_string(state::GameState)::String
     else
         "Cut's turn"
     end
+end
+
+function weights_string(state::GameState)::String
+    lines = ["Weights:"]
+    for e in state.graph.edges
+        push!(lines, "$(e.u.id) → $(e.v.id) : $(round(e.weight, digits=1))")
+    end
+    return join(lines, "\n")
 end
 
 # ============================================
@@ -169,16 +167,20 @@ function run_game()
     positions_ref = Ref(compute_positions(graph_ref[]))
     state_obs = Observable(new_game(graph_ref[]))
 
-    win = GtkWindow("Shannon-Switching Game", CANVAS_SIZE, CANVAS_SIZE + 110)
+    win = GtkWindow("Shannon-Switching Game", CANVAS_SIZE + PANEL_WIDTH, CANVAS_SIZE + 110)
     vbox = GtkBox(:v)
+    hbox_main = GtkBox(:h)
     label = GtkLabel(status_string(state_obs[]))
     canvas = GtkCanvas(CANVAS_SIZE, CANVAS_SIZE)
+    weights_label = GtkLabel("")
     weighted_check = GtkCheckButton("Weighted")
     btn = GtkButton("New Game")
 
     push!(win, vbox)
     push!(vbox, label)
-    push!(vbox, canvas)
+    push!(hbox_main, canvas)
+    push!(hbox_main, weights_label)
+    push!(vbox, hbox_main)
     push!(vbox, weighted_check)
     push!(vbox, btn)
 
@@ -186,13 +188,21 @@ function run_game()
 
     @guarded draw(canvas) do widget
         ctx = getgc(widget)
-        is_weighted = Gtk4.G_.get_active(weighted_check)
-        draw_graph(ctx, state_obs[], positions_ref[], is_weighted)
+        draw_graph(ctx, state_obs[], positions_ref[])
     end
 
     on(state_obs) do state
-        Gtk4.G_.set_label(label, status_string(state))
-        draw(canvas)
+        @idle_add begin
+            Gtk4.G_.set_label(label, status_string(state))
+            is_weighted = Gtk4.G_.get_active(weighted_check)
+            if is_weighted
+                Gtk4.G_.set_label(weights_label, weights_string(state))
+            else
+                Gtk4.G_.set_label(weights_label, "")
+            end
+            draw(canvas)
+            return false
+        end
     end
 
     click = GtkGestureClick()
