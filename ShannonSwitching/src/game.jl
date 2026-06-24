@@ -111,13 +111,13 @@ function make_move!(state::GameState, e::Edge)::Nothing
 end
 
 function  random_graph(n::Int, m::Int; weighted=false)::GameGraph
-    n = rand(1:15)
+    n = rand(4:10)
     lm =[n-1]
     i = 5 
 
     while i!=0
         f = rand(1:6)
-        push!(lm,n+1)
+        push!(lm,n+f)
         i-=1
     end 
     m = rand(lm)
