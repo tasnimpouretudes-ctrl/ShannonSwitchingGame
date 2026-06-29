@@ -1,8 +1,16 @@
-# =========================
-# Basic graph helpers
-# =========================
+# ==============================================================================
+# Graph Construction
+# ==============================================================================
 
-other_vertex(e::Edge, vid::Int) = e.u.id == vid ? e.v.id : e.u.id
+"""
+    build_gprime(state)
+
+Constructs the graph G′ used throughout the optimal strategy.
+G' contains:
+-neutral edges
+-short owned 
+Cut edges are excluded.
+"""
 
 function build_gprime(state::GameState)::Vector{Edge}
     [e for e in state.graph.edges if e.state != :cut]
@@ -17,6 +25,29 @@ function edge_adj(edges::Vector{Edge})
     adj
 end
 
+# ==============================================================================
+# Breadth-First Search
+# ==============================================================================
+
+"""
+    bfs_path(start, goal, edges)
+
+Computes a path between the vertices `start` and `goal`
+using only the given edges.
+
+Arguments
+---------
+- `start` : source vertex id.
+- `goal`  : destination vertex id.
+- `edges` : edge set defining the graph.
+
+Returns
+-------
+A vector of edges representing the path from `start`
+to `goal`.
+
+If no path exists, an empty vector is returned.
+"""
 function bfs_path(s::Int, t::Int, edges::Vector{Edge})::Vector{Edge}
     adj = edge_adj(edges)
     q = [s]
@@ -46,6 +77,29 @@ function bfs_path(s::Int, t::Int, edges::Vector{Edge})::Vector{Edge}
     path
 end
 
+# ==============================================================================
+# Connected Components
+# ==============================================================================
+
+"""
+    reachable_vertices(start, edges)
+
+Computes the connected component containing the vertex `start`
+using only the supplied edges.
+
+Arguments
+---------
+- `start` : starting vertex id.
+- `edges` : edge set defining the graph.
+
+Returns
+-------
+A set containing the ids of all reachable vertices.
+
+This function is used in Algorithm 1 after removing one edge
+from a spanning tree in order to obtain the two connected
+components Cₛ and Cₜ.
+"""
 function reachable_vertices(start::Int, edges::Vector{Edge})::Set{Int}
     adj = Dict{Int, Vector{Int}}()
     for e in edges
@@ -66,11 +120,25 @@ function reachable_vertices(start::Int, edges::Vector{Edge})::Set{Int}
     seen
 end
 
-# =========================
-# Spanning tree utilities
-# =========================
+"""
+    spanning_tree(edges, vertices)
 
-function spanning_tree_from_order(edges::Vector{Edge}, vertices::Vector{Vertex})::Vector{Edge}
+Computes a spanning tree of the graph induced by `edges`
+using Kruskal's algorithm.
+
+Arguments
+---------
+- `edges`    : edges of G'
+- `vertices` : graph vertices
+
+Returns
+-------
+A set of edges forming a spanning tree.
+
+Throws an error if the graph is disconnected.
+"""
+
+function spanning_tree(edges::Vector{Edge}, vertices::Vector{Vertex})::Vector{Edge}
     idx = Dict(v.id => i for (i, v) in enumerate(vertices))
     uf = UnionFind(length(vertices))
     T = Edge[]
@@ -84,6 +152,25 @@ function spanning_tree_from_order(edges::Vector{Edge}, vertices::Vector{Vertex})
     T
 end
 
+"""
+    fundamental_cycle(chord, tree)
+ 
+Computes FC(chord, tree): the set of edges forming the unique cycle
+in tree u {chord}.
+ 
+This is found by running BFS from chord.u to chord.v inside `tree`,
+then adding `chord` itself to close the cycle.
+ 
+Arguments
+---------
+- `chord` : the chord edge (not in `tree`).
+- `tree`  : a spanning tree as a Set{Edge}.
+ 
+Returns
+-------
+A Set{Edge} containing the edges of the fundamental cycle.
+"""
+
 function fundamental_cycle(chord::Edge, T::Vector{Edge})::Set{Edge}
     path = bfs_path(chord.u.id, chord.v.id, T)
     cycle = Set(path)
@@ -91,10 +178,30 @@ function fundamental_cycle(chord::Edge, T::Vector{Edge})::Set{Edge}
     cycle
 end
 
-# =========================
-# Kishi–Kajitani
-# =========================
-
+# ==============================================================================
+# Kishi-Kajitani: two maximally distant spanning trees
+# ==============================================================================
+# Goal: find two spanning trees T1 and T2 of G' such that their NEUTRAL
+# edges are disjoint. We do this by making T1 and T2 "maximally distant",
+# meaning no swap can increase |T1 \ T2| any further.
+#
+# Key definitions from PDF
+#   - A "chord" of tree T is an edge in G' that is NOT in T.
+#   - A "common chord" is an edge that is a chord of BOTH T1 and T2
+#     (i.e. it belongs to neither tree).
+#   - The "fundamental cycle" FC(e, T) of a chord e w.r.t. tree T is
+#     the set of edges forming the unique cycle in T u {e}.
+#     In practice: it is the path from e.u to e.v inside T, plus e itself.
+#
+# Algorithm 3 (Kishi-Kajitani):
+#   Repeat until no common chord can improve the distance:
+#     For each common chord e, try to augment (swap edges to increase distance).
+#
+# Algorithm 4 (Augment):
+#   Build layers L starting from FC(e, T1).
+#   Alternate between T1 and T2 to extend the layers.
+#   If a layer intersects the "other" tree → perform the swap (chain exchange).
+ 
 function augment!(T1::Vector{Edge}, T2::Vector{Edge}, e::Edge)::Bool
     par = Dict{Int, Int}()
 
