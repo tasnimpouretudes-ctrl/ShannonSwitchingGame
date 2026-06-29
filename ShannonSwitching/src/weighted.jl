@@ -1,3 +1,5 @@
+const TEAM_NAME::String = "Gruppe57"
+
 function weighted_short(state::GameState)::Edge
     path = find_best_virtual_path(state)
     
