@@ -208,76 +208,79 @@ end
 # =========================================================================
 # weighted_cut
 # =========================================================================
-
+ 
 """
     weighted_cut(state)
-
+ 
 Wettbewerbsstrategie für Cut im gewichteten Spiel.
-
+ 
 Idee: Cut berechnet zuerst den aktuell günstigsten s-t-Weg für Short.
 Für jede neutrale Kante auf diesem Weg simuliert Cut, was passieren würde,
 wenn er genau diese Kante entfernt: er berechnet den NEUEN günstigsten
 Weg ohne diese Kante und vergleicht dessen Kosten.
-
+ 
 Cut wählt die Kante, deren Entfernung die höchsten neuen Kosten erzeugt
 (oder den Weg komplett zerstört).
-
+ 
 Dies ist aufwändiger als nur die billigste Kante des aktuellen Weges zu
 entfernen, simuliert aber tatsächlich die Konsequenz jedes Kandidaten-Zugs.
-
+ 
 Arguments
 ---------
 - `state` : aktueller Spielzustand.
-
+ 
 Returns
 -------
 Die Edge, die Cut als nächstes entfernen sollte.
 """
 function weighted_cut(state::GameState)::Edge
-
+ 
     moves = valid_moves(state)
     isempty(moves) && error("No valid moves available")
-
+ 
     g      = state.graph
     gprime = build_weighted_gprime(state)
-
+ 
+    # Map id -> echte Kante für O(1)-Lookup, statt jedes Mal g.edges zu durchsuchen
+    edge_map = Dict(e.id => e for e in g.edges)
+ 
     weg, kosten = dijkstra_path(g.s.id, g.t.id, gprime)
-
+ 
     # Kein Weg vorhanden -> Cut hat schon strukturell gewonnen, beliebiger Zug
     isinf(kosten) && return first(moves)
-
+ 
     # Neutrale Kanten auf dem aktuellen günstigsten Weg sammeln
     neutrale_kanten_im_weg = filter(e -> e.state == :neutral, weg)
-
+ 
     isempty(neutrale_kanten_im_weg) && return first(moves)
-
-    beste_kante = nothing
-    bester_neuer_kosten = -Inf
-
+ 
+    # Defensiver Start: erste neutrale Kante als Default, falls aus
+    # irgendeinem Grund keine Verbesserung gefunden wird
+    beste_kante          = neutrale_kanten_im_weg[1]
+    bester_neuer_kosten  = -Inf
+ 
     for kandidat in neutrale_kanten_im_weg
-
+ 
         # G' ohne diese Kandidaten-Kante aufbauen
         gprime_ohne_kandidat = filter(e -> e.id != kandidat.id, gprime)
-
+ 
         neuer_weg, neue_kosten = dijkstra_path(g.s.id, g.t.id, gprime_ohne_kandidat)
-
+ 
         # Wenn das Entfernen dieser Kante s und t komplett trennt,
         # ist das der bestmögliche Zug -> sofort zurückgeben
         if isinf(neue_kosten)
-            echte_kante = first(filter(x -> x.id == kandidat.id, g.edges))
-            return echte_kante
+            return edge_map[kandidat.id]
         end
-
+ 
         if neue_kosten > bester_neuer_kosten
             bester_neuer_kosten = neue_kosten
             beste_kante = kandidat
         end
-
+ 
     end
-
+ 
     # Echte Kante aus dem Spielzustand zurückgeben (nicht die Kopie mit
     # virtuellem Gewicht)
-    echte_kante = first(filter(x -> x.id == beste_kante.id, g.edges))
-    return echte_kante
-
+    return edge_map[beste_kante.id]
+ 
 end
