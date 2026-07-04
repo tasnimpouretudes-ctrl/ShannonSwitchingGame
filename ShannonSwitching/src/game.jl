@@ -110,75 +110,94 @@ function make_move!(state::GameState, e::Edge)::Nothing
     return nothing 
 end
 
-function  random_graph(n::Int, m::Int; weighted=false)::GameGraph
-    n = rand(4:10)
-    lm =[n-1]
-    i = 5 
+function random_graph(n::Int, m::Int; weighted=false)::GameGraph
 
-    while i!=0
-        f = rand(1:6)
-        push!(lm,n+f)
-        i-=1
-    end 
-    m = rand(lm)
-
-
-
-
-    if m < n-1 
-        return error("Diese Graph ist nicht zusammenhanged ")
-    else 
-        ve = []
-        e = []
-        for i in 1:n
-            push!(ve,Vertex(i))
-        end 
-         k = ve
-        for s in 1:n-1
-            if s == 1 
-                k = shuffle(k)
-                a = pop!(k)
-                b = pop!(k)
-                if weighted === false 
-                    push!(e,Edge(s,a,b,1,:neutral))
-                else 
-                    push!(e,Edge(s,a,b,rand(1:10),:neutral))
-                end
-            else 
-                a = e[s-1].v
-                k= shuffle(k)
-                b = pop!(k)
-                if weighted === false 
-                    push!(e,Edge(s,a,b,1,:neutral))
-                else 
-                    push!(e,Edge(s,a,b,rand(1:10),:neutral))
-                end
-            end 
-        end 
-        if m > n-1
-            ex = Set{Tuple{Int,Int}}()
-            for edge in e
-                push!(ex, (min(edge.u.id, edge.v.id), max(edge.u.id, edge.v.id)))
-            end
     
-            s = n
-            while s <= m
-                r = shuffle(ve)
-                a = pop!(r)
-                b = pop!(r)
-                k = (min(a.id, b.id), max(a.id, b.id))
-                if k ∉ ex
-                    push!(ex, k)
-                    w = weighted ? rand(1:10) : 1
-                    push!(e, Edge(s, a, b, w, :neutral))
-                    s += 1
-                end
-            end
+    n = rand(4:10)
+
+    
+    max_extra = div(n*(n-1),2) - (n-1)
+
+    possible_m = collect(n-1:n-1+max_extra)
+
+    m = rand(possible_m)
+
+
+    ve = Vertex[]
+    e = Edge[]
+
+    
+    for i in 1:n
+        push!(ve, Vertex(i))
+    end
+
+
+   
+    for i in 2:n
+
+        a = ve[i]
+        b = ve[rand(1:i-1)]
+
+        w = weighted ? rand(1:10) : 1
+
+        push!(
+            e,
+            Edge(length(e)+1, a, b, w, :neutral)
+        )
+    end
+
+
+
+    
+    if m > n-1
+
+        existing = Set{Tuple{Int,Int}}()
+
+        for edge in e
+            push!(
+                existing,
+                (min(edge.u.id, edge.v.id),
+                 max(edge.u.id, edge.v.id))
+            )
         end
 
 
+        while length(e) < m
 
-        
-    end 
-    return GameGraph(ve,e,ve[1],ve[end])
-end 
+            a, b = rand(ve,2)
+
+           
+            if a.id == b.id
+                continue
+            end
+
+
+            pair = (
+                min(a.id,b.id),
+                max(a.id,b.id)
+            )
+
+
+           
+            if pair ∉ existing
+
+                push!(existing,pair)
+
+                w = weighted ? rand(1:10) : 1
+
+                push!(
+                    e,
+                    Edge(length(e)+1, a, b, w, :neutral)
+                )
+            end
+        end
+    end
+
+
+    return GameGraph(
+        ve,
+        e,
+        ve[1],
+        ve[end]
+    )
+end
