@@ -323,7 +323,7 @@ end
 
 function short_strategy(state::GameState)::Edge
     moves = valid_moves(state)
-    isempty(moves) && error("No valid moves")
+    isempty(moves) && return state.graph.edges[1]
 
     g = state.graph
     gprime = build_gprime(state)
