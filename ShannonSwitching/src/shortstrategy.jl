@@ -352,11 +352,11 @@ function short_strategy(state::GameState)::Edge
     end
 
     if a in At
-        Cs, Ct = cut_partition(At, a, g.s.id)
+        Cs, Ct = cut_partition(At, a, g.vertices, g.s.id)
         b = crossing_edge(Bt, Cs, Ct)
         return b === nothing ? first(moves) : b
     elseif a in Bt
-        Cs, Ct = cut_partition(Bt, a, g.s.id)
+        Cs, Ct = cut_partition(Bt, a, g.vertices, g.s.id)
         b = crossing_edge(At, Cs, Ct)
         return b === nothing ? first(moves) : b
     else
