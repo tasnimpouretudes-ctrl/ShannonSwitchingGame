@@ -303,15 +303,10 @@ function last_cut_edge(state::GameState)
     nothing
 end
 
-function cut_partition(tree::Vector{Edge}, a::Edge, s::Int)
+function cut_partition(tree::Vector{Edge}, a::Edge, all_vertices::Vector{Vertex}, s::Int)
     tree_wo = [e for e in tree if e.id != a.id]
     Cs = reachable_vertices(s, tree_wo)
-    allv = Set{Int}()
-    for e in tree_wo
-        push!(allv, e.u.id)
-        push!(allv, e.v.id)
-    end
-    Ct = setdiff(allv, Cs)
+    Ct = setdiff(Set(v.id for v in all_vertices), Cs)
     Cs, Ct
 end
 
