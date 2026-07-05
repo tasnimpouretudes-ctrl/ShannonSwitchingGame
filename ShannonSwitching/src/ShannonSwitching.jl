@@ -1,7 +1,8 @@
 module ShannonSwitching
 
 include("game.jl")
-include("strategies.jl")
+include("shortstrategy.jl")
+include("weighted.jl")
 include("gui.jl")
 
 export Vertex
