@@ -178,7 +178,7 @@ Die Edge, die Short als nächstes beanspruchen sollte.
 function weighted_short(state::GameState)::Edge
 
     moves = valid_moves(state)
-    isempty(moves) && error("No valid moves available")
+    isempty(moves) && return state.graph.edges[1]
 
     g      = state.graph
     gprime = build_weighted_gprime(state)
@@ -236,7 +236,7 @@ Die Edge, die Cut als nächstes entfernen sollte.
 function weighted_cut(state::GameState)::Edge
  
     moves = valid_moves(state)
-    isempty(moves) && error("No valid moves available")
+    isempty(moves) && return state.graph.edges[1]
  
     g      = state.graph
     gprime = build_weighted_gprime(state)
