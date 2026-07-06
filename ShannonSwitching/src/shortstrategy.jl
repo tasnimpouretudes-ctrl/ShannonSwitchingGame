@@ -271,8 +271,8 @@ function augment!(T1::Vector{Edge}, T2::Vector{Edge}, e::Edge)::Bool
 end
 
 function maximally_distant_trees(gprime::Vector{Edge}, vertices::Vector{Vertex})
-    T1 = spanning_tree_from_order(gprime, vertices)
-    T2 = spanning_tree_from_order(reverse(gprime), vertices)
+    T1 = spanning_treer(gprime, vertices)
+    T2 = spanning_tree(reverse(gprime), vertices)
 
     changed = true
     while changed
