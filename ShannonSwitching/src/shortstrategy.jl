@@ -271,8 +271,8 @@ function augment!(T1::Vector{Edge}, T2::Vector{Edge}, e::Edge)::Bool
 end
 
 function maximally_distant_trees(gprime::Vector{Edge}, vertices::Vector{Vertex})
-    T1 = spanning_tree_from_order(gprime, vertices)
-    T2 = spanning_tree_from_order(reverse(gprime), vertices)
+    T1 = spanning_treer(gprime, vertices)
+    T2 = spanning_tree(reverse(gprime), vertices)
 
     changed = true
     while changed
@@ -303,15 +303,10 @@ function last_cut_edge(state::GameState)
     nothing
 end
 
-function cut_partition(tree::Vector{Edge}, a::Edge, s::Int)
+function cut_partition(tree::Vector{Edge}, a::Edge, all_vertices::Vector{Vertex}, s::Int)
     tree_wo = [e for e in tree if e.id != a.id]
     Cs = reachable_vertices(s, tree_wo)
-    allv = Set{Int}()
-    for e in tree_wo
-        push!(allv, e.u.id)
-        push!(allv, e.v.id)
-    end
-    Ct = setdiff(allv, Cs)
+    Ct = setdiff(Set(v.id for v in all_vertices), Cs)
     Cs, Ct
 end
 
@@ -328,7 +323,7 @@ end
 
 function short_strategy(state::GameState)::Edge
     moves = valid_moves(state)
-    isempty(moves) && error("No valid moves")
+    isempty(moves) && return state.graph.edges[1]
 
     g = state.graph
     gprime = build_gprime(state)
@@ -357,11 +352,11 @@ function short_strategy(state::GameState)::Edge
     end
 
     if a in At
-        Cs, Ct = cut_partition(At, a, g.s.id)
+        Cs, Ct = cut_partition(At, a, g.vertices, g.s.id)
         b = crossing_edge(Bt, Cs, Ct)
         return b === nothing ? first(moves) : b
     elseif a in Bt
-        Cs, Ct = cut_partition(Bt, a, g.s.id)
+        Cs, Ct = cut_partition(Bt, a, g.vertices, g.s.id)
         b = crossing_edge(At, Cs, Ct)
         return b === nothing ? first(moves) : b
     else
