@@ -203,67 +203,56 @@ end
 #   If a layer intersects the "other" tree → perform the swap (chain exchange).
  
 function augment!(T1::Vector{Edge}, T2::Vector{Edge}, e::Edge)::Bool
-    par = Dict{Int, Int}()
+    par = Dict{Edge, Edge}()
 
-    L = fundamental_cycle(e, T1)
-    delete!(L, e)
-    Lprev = Set{Edge}()
+    # F = front (only newly reached edges at current layer)
+    # V = all visited edges so far
+    F = fundamental_cycle(e, T1)
+    delete!(F, e)
+    V = copy(F)
     k = 1
 
-    while L != Lprev
-        Lprev = copy(L)
+    while !isempty(F)
         Talt = isodd(k) ? T2 : T1
 
-        inter = [x for x in L if x in Talt]
+        # Test ONLY the current front F against Talt, not all of V
+        inter = [x for x in F if x in Talt]
+
         if !isempty(inter)
             f = first(inter)
-            chain = [f]
-            x = f
-            while haskey(par, x.id)
-                pid = par[x.id]
-                px = nothing
-                for z in Lprev
-                    if z.id == pid
-                        px = z
-                        break
-                    end
-                end
-                px === nothing && break
-                x = px
-                pushfirst!(chain, x)
+            chain = Edge[f]
+            cur = f
+            while haskey(par, cur)
+                cur = par[cur]
+                pushfirst!(chain, cur)
             end
 
-            newT1 = copy(T1)
-            newT2 = copy(T2)
-
-            deleteat!(newT1, findall(x -> x.id == e.id, newT1))
-            push!(newT1, e)
-
+            push!(T1, e)
             for (i, c) in enumerate(chain)
                 if isodd(i)
-                    deleteat!(newT1, findall(x -> x.id == c.id, newT1))
-                    push!(newT2, c)
+                    filter!(x -> x.id != c.id, T1)
+                    push!(T2, c)
                 else
-                    deleteat!(newT2, findall(x -> x.id == c.id, newT2))
-                    push!(newT1, c)
+                    push!(T1, c)
+                    filter!(x -> x.id != c.id, T2)
                 end
             end
-
-            empty!(T1); append!(T1, newT1)
-            empty!(T2); append!(T2, newT2)
             return true
         end
 
-        newL = copy(L)
-        for g in L
+        # Build next front F' from fundamental cycles of F's edges
+        # only adding edges not already in V
+        F_next = Set{Edge}()
+        for g in F
             for f in fundamental_cycle(g, Talt)
-                if !(f in L)
-                    push!(newL, f)
-                    haskey(par, f.id) || (par[f.id] = g.id)
+                if f ∉ V
+                    push!(F_next, f)
+                    push!(V, f)
+                    haskey(par, f) || (par[f] = g)
                 end
             end
         end
-        L = newL
+        F = F_next
         k += 1
     end
 
