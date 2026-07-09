@@ -1,3 +1,34 @@
+mutable struct UnionFinder
+    parent::Vector{Int}
+    rank::Vector{Int}
+end
+
+function UnionFinder(n::Int)
+    UnionFinder(collect(1:n), zeros(Int, n))
+end
+
+function find!(uf::UnionFinder, x::Int)::Int
+    if uf.parent[x] != x
+        uf.parent[x] = find!(uf, uf.parent[x])
+    end
+    uf.parent[x]
+end
+
+function Base.union!(uf::UnionFinder, x::Int, y::Int)::Bool
+    rx, ry = find!(uf, x), find!(uf, y)
+    rx == ry && return false
+    if uf.rank[rx] < uf.rank[ry]
+        rx, ry = ry, rx
+    end
+    uf.parent[ry] = rx
+    uf.rank[rx] += (uf.rank[rx] == uf.rank[ry])
+    true
+end
+
+function other_vertex(e::Edge, v_id::Int)::Int
+    e.u.id == v_id ? e.v.id : e.u.id
+end 
+
 # ==============================================================================
 # Graphaufbau
 # ==============================================================================
@@ -187,7 +218,7 @@ spanning_tree([e1,e2,e3], vertices) → [e1, e2]  (oder ähnlich, n-1=2 Kanten)
 """
 function spanning_tree(edges::Vector{Edge}, vertices::Vector{Vertex})::Vector{Edge}
     idx = Dict(v.id => i for (i, v) in enumerate(vertices))
-    uf = UnionFind(length(vertices))
+    uf = UnionFinder(length(vertices))
     T = Edge[]
     for e in edges
         if union!(uf, idx[e.u.id], idx[e.v.id])
