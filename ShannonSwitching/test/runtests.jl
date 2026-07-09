@@ -417,7 +417,7 @@ include("../src/game.jl")
 include("../src/shortstrategy.jl")
 include("../src/weighted.jl")
 
-@testset "Strategies.jl" begin
+@testset "Strategies" begin
 
     function small_game()
         g = random_graph(5, 7)
