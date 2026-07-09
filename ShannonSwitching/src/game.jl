@@ -60,7 +60,7 @@ end
 """
 check_winner(state::GameState)::Union{Symbol, Nothing}: 
 Gibt:shortzurück,fallsShorts beanspruchte Kanten einen s-t-Weg umfassen; 
-gibt :cut zurück, falls im verbleibenden Gra- phen kein s-t-Weg mehr existiert; sonst nothing.
+gibt :cut zurück, falls im verbleibenden Graphen kein s-t-Weg mehr existiert; sonst nothing.
 
 
 # Beispiel
@@ -157,9 +157,9 @@ end
 end
 """
 random_graph(n::Int, m::Int; weighted=false)::GameGraph: 
-Erzeugt einen zufa ̈lligen zu- sammenhängenden Graphen mit n Knoten und m Kanten. 
+Erzeugt einen zufälligen zu- sammenhängenden Graphen mit n Knoten und m Kanten. 
 Knoten 1 ist die Quelle s, Kno- ten n ist das Ziel t. 
-Im gewichteten Fall werden Kantengewichte gleichma ̈ßig aus [1,10] gezogen.
+Im gewichteten Fall werden Kantengewichte gleichmäßig aus [1,10] gezogen.
 # Beispiel
 
 ```julia 
