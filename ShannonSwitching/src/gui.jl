@@ -247,6 +247,7 @@ function run_game()
         !isnothing(state.winner) && return
         clicked_edge = find_closest_edge(state, positions_ref[], x, y)
         isnothing(clicked_edge) && return
+        clicked_edge = short_strategy(state)
         make_move!(state, clicked_edge)
         notify(state_obs)
     end
