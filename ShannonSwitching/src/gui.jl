@@ -64,10 +64,11 @@ end
 
 Berechnet die Positionen aller Knoten auf dem Canvas.
 - n = Anzahl der Knoten.
-- Dictionary: Knoten-ID → (x, y) Koordinaten.
-- shuffle() mischt die Winkel → Knoten stehen bei jeder Partie anders.
-- 2π / n verteilt die Knoten gleichmäßig auf einem Kreis.
-- cos() und sin() berechnen die x- und y-Koordinaten.
+- Erstellen Dictionary: Knoten-ID → (x, y) Koordinaten.
+- Center_x und center_y. Das ist die Mitte des Canvas.
+- Wir nehmen die Zahlen von 0 bis n minus 1, mischen sie mit shuffle.
+- Multiplizieren mit 2π / n damit die Knoten gleichmäßig auf dem Kreis liegen.
+- Dann gehen wir durch alle Knoten. cos() und sin() berechnen die x- und y-Koordinaten.
 """
 function compute_positions(graph::GameGraph)
     n = length(graph.vertices)
@@ -88,7 +89,7 @@ end
     draw_graph(ctx, state, positions)
 
 Hauptfunktion zum Zeichnen des Graphen.
-- Zuerst Canvas weiß färben → alte Zeichnung löschen.
+- Zuerst färben wir den ganzen Canvas weiß. → alte Zeichnung löschen.
 - Dann alle Kanten zeichnen (draw_edge).
 - Dann alle Knoten darüber zeichnen (draw_vertex).
 - Kanten zuerst → Knoten liegen darüber und bleiben sichtbar.
@@ -118,8 +119,8 @@ end
     distance_to_segment(px, py, x1, y1, x2, y2)
 
 Berechnet die Distanz zwischen einem Mausklick und einer Kante.
-- Findet den nächsten Punkt auf der Kante zum Klick.
-- Berechnet dann die euklidische Distanz.
+- Die Funktion findet den nächsten Punkt auf der Kante zum Klick.
+- Dann berechnet sie die Distanz mit der euklidischen Formel.
 - Wird von find_closest_edge benutzt.
 """
 function distance_to_segment(px, py, x1, y1, x2, y2)
@@ -141,9 +142,9 @@ end
 Sucht die Kante, auf die der Benutzer geklickt hat.
 - best_edge = nothing → noch keine Kante gefunden.
 - Maximale Distanz: 20 Pixel.
-- Nur neutrale Kanten werden geprüft (andere wurden schon gespielt).
+- Wir prüfen nur neutrale Kanten (andere wurden schon gespielt).
 - Für jede neutrale Kante: Distanz berechnen → beste Kante speichern.
-- Gibt die nächste Kante zurück, oder nothing wenn zu weit.
+- Wir geben die nächste Kante zurück, oder nothing wenn zu weit.
 """
 function find_closest_edge(state::GameState, positions::Dict, click_x, click_y)
     best_edge = nothing
@@ -165,8 +166,8 @@ end
     status_string(state)
 
 Gibt den Text zurück, der oben im Fenster angezeigt wird.
-- Gewinner vorhanden → "Short wins!" oder "Cut wins!"
-- Kein Gewinner → "Short's turn" oder "Cut's turn"
+- Gewinner → "Short wins!" oder "Cut wins!"
+- Kein Gewinner → zeigen wir den aktuellen spieler an: "Short's turn" oder "Cut's turn"
 """
 function status_string(state::GameState)::String
     if !isnothing(state.winner)
@@ -195,16 +196,18 @@ end
 """
     run_game()
 
-Hauptfunktion der GUI. Startet das Spiel.
-- Erstellt den Graphen, die Positionen und den Spielzustand.
-- Ref() = veränderbare Box für Graph und Positionen (nötig für New Game).
-- Observable = Box für den Spielzustand → automatische Aktualisierung.
-- @guarded draw: zeichnet den Graphen bei jedem Neuzeichnen.
-- on(state_obs): nach jedem Zug → Label und Canvas automatisch aktualisieren.
-- @idle_add: verhindert Gtk4-Abstürze bei der Aktualisierung.
-- Klick-Handler: findet die angeklickte Kante → make_move! → notify.
-- New Game Button: neuer Graph, neue Positionen, neue Partie.
-- start_main_loop: hält das Fenster offen und wartet auf Eingaben.
+- "Zuerst erstellen wir den Graphen, die Positionen und den Spielzustand."
+- "Ref() ist eine Box für Graph und Positionen, die wir später ändern können."
+- "Observable ist eine Box für den Spielzustand mit automatischer Aktualisierung."
+
+- "Dann bauen wir das Fenster mit Label, Canvas und New Game Button."
+- "Mit push! fügen wir alles zusammen."
+
+- "Im dritten Teil verbinden wir alles mit dem Spielzustand."
+- "Nach jedem Klick auf eine Kante wird der Zug ausgeführt und die Oberfläche automatisch aktualisiert."
+- "Der New Game Button startet eine neue Partie mit einem neuen Graphen."
+
+- "start_main_loop hält das Fenster offen."
 """
 function run_game()
     graph_ref = Ref(random_graph(0, 0))
@@ -254,7 +257,7 @@ function run_game()
         positions_ref[] = new_pos
         state_obs[] = new_game(new_g)
         notify(state_obs)
-    end
+    end 
 
     Gtk4.start_main_loop()
 end
