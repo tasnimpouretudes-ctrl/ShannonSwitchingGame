@@ -297,7 +297,7 @@ function augment!(T1::Vector{Edge}, T2::Vector{Edge}, e::Edge)::Bool
     # V = alle bisher besuchten Kanten
     F = fundamental_cycle(e, T1)
     delete!(F, e)
-    V = copy(F)
+    V = copy(F)       #visited
     k = 1
 
     while !isempty(F)
