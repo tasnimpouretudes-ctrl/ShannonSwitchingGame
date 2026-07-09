@@ -304,7 +304,7 @@ function augment!(T1::Vector{Edge}, T2::Vector{Edge}, e::Edge)::Bool
         Talt = isodd(k) ? T2 : T1
 
         # Nur die aktuelle Front F gegen Talt testen, nicht alle von V
-        inter = [x for x in F if x in Talt]           #list comprehension
+        inter = [x for x in F if x in Talt]                 #list comprehension
 
         if !isempty(inter)
             f = first(inter)
