@@ -1,17 +1,33 @@
 # ==============================================================================
-# Graph Construction
+# Graphaufbau
 # ==============================================================================
 
 """
     build_gprime(state)
 
-Constructs the graph G′ used throughout the optimal strategy.
-G' contains:
--neutral edges
--short owned 
-Cut edges are excluded.
-"""
+Konstruiert den Teilgraphen G′, der für die optimale Strategie verwendet wird.
 
+Rolle
+-----
+G' ist der "aktive" Graph: er enthält alle Kanten, die noch relevant sind,
+d.h. neutrale Kanten (noch nicht gespielt) und Short-beanspruchte Kanten
+(bereits gesichert). Von Cut entfernte Kanten werden ausgeschlossen,
+da sie dauerhaft aus dem Spiel sind.
+
+Argumente
+---------
+- `state` : aktueller Spielzustand.
+
+Rückgabe
+--------
+Ein Vector{Edge} mit allen Kanten, deren Zustand nicht :cut ist.
+
+Beispiel
+--------
+Angenommen der Graph hat 3 Kanten:
+  e1 (state = :neutral), e2 (state = :short), e3 (state = :cut)
+→ build_gprime gibt [e1, e2] zurück.
+"""
 function build_gprime(state::GameState)::Vector{Edge}
     [e for e in state.graph.edges if e.state != :cut]
 end
@@ -26,27 +42,39 @@ function edge_adj(edges::Vector{Edge})
 end
 
 # ==============================================================================
-# Breadth-First Search
+# Breitensuche
 # ==============================================================================
 
 """
-    bfs_path(start, goal, edges)
+    bfs_path(s, t, edges)
 
-Computes a path between the vertices `start` and `goal`
-using only the given edges.
+Berechnet einen Weg zwischen den Knoten `s` und `t`
+unter Verwendung nur der angegebenen Kanten.
 
-Arguments
+Rolle
+-----
+Wird an zwei Stellen verwendet:
+  1. In `fundamental_cycle`: um den eindeutigen Weg zwischen den
+     Endpunkten einer Sehne innerhalb eines Spannbaums zu finden.
+  2. In `short_strategy`: um im Fallback-Fall eine neutrale Kante
+     auf einem s-t-Weg in G' zu wählen.
+
+Argumente
 ---------
-- `start` : source vertex id.
-- `goal`  : destination vertex id.
-- `edges` : edge set defining the graph.
+- `s`     : ID des Startknotens.
+- `t`     : ID des Zielknotens.
+- `edges` : Kantenmenge, die den Graphen definiert.
 
-Returns
--------
-A vector of edges representing the path from `start`
-to `goal`.
+Rückgabe
+--------
+Ein Vector{Edge} mit den Kanten des gefundenen Weges (in Reihenfolge).
+Falls kein Weg existiert, wird ein leerer Vektor zurückgegeben.
 
-If no path exists, an empty vector is returned.
+Beispiel
+--------
+Graph: s --e1-- a --e2-- t
+bfs_path(s.id, t.id, [e1, e2]) → [e1, e2]
+bfs_path(s.id, t.id, [e1])     → []   (t nicht erreichbar)
 """
 function bfs_path(s::Int, t::Int, edges::Vector{Edge})::Vector{Edge}
     adj = edge_adj(edges)
@@ -78,27 +106,36 @@ function bfs_path(s::Int, t::Int, edges::Vector{Edge})::Vector{Edge}
 end
 
 # ==============================================================================
-# Connected Components
+# Zusammenhangskomponenten
 # ==============================================================================
 
 """
     reachable_vertices(start, edges)
 
-Computes the connected component containing the vertex `start`
-using only the supplied edges.
+Berechnet alle Knoten, die von `start` aus über die gegebenen Kanten
+erreichbar sind.
 
-Arguments
+Rolle
+-----
+Wird in `cut_partition` verwendet: nachdem eine Kante `a` aus einem
+Spannbaum At entfernt wurde, zerfällt At in zwei Teilbäume. Diese
+Funktion bestimmt durch BFS, welche Knoten noch mit s verbunden sind
+(Komponente Cs) bzw. mit t (Komponente Ct).
+
+Argumente
 ---------
-- `start` : starting vertex id.
-- `edges` : edge set defining the graph.
+- `start` : ID des Startknotens.
+- `edges` : Kantenmenge, die den Graphen definiert.
 
-Returns
--------
-A set containing the ids of all reachable vertices.
+Rückgabe
+--------
+Eine Set{Int} mit den IDs aller erreichbaren Knoten.
 
-This function is used in Algorithm 1 after removing one edge
-from a spanning tree in order to obtain the two connected
-components Cₛ and Cₜ.
+Beispiel
+--------
+Baum: s --e1-- a --e2-- t, Kante e1 entfernt.
+reachable_vertices(s.id, [e2]) → {a.id, t.id}
+reachable_vertices(s.id, [])   → {s.id}
 """
 function reachable_vertices(start::Int, edges::Vector{Edge})::Set{Int}
     adj = Dict{Int, Vector{Int}}()
@@ -123,21 +160,31 @@ end
 """
     spanning_tree(edges, vertices)
 
-Computes a spanning tree of the graph induced by `edges`
-using Kruskal's algorithm.
+Berechnet einen Spannbaum des durch `edges` induzierten Graphen
+mittels Kruskal-Algorithmus.
 
-Arguments
+Rolle
+-----
+Liefert einen der beiden Ausgangsspannbäume At und Bt für den
+Kishi-Kajitani-Algorithmus. Wird zweimal aufgerufen: einmal mit
+`gprime` und einmal mit `reverse(gprime)`, um zwei verschiedene
+Startbäume zu erhalten.
+
+Argumente
 ---------
-- `edges`    : edges of G'
-- `vertices` : graph vertices
+- `edges`    : Kanten von G', aus denen der Spannbaum gebaut wird.
+- `vertices` : alle Knoten des Graphen (für den Union-Find-Index).
 
-Returns
--------
-A set of edges forming a spanning tree.
+Rückgabe
+--------
+Ein Vector{Edge} mit genau n-1 Kanten, der einen Spannbaum bildet.
+Wirft einen Fehler, falls der Graph nicht zusammenhängend ist.
 
-Throws an error if the graph is disconnected.
+Beispiel
+--------
+Graph mit 3 Knoten und Kanten e1=(1,2), e2=(2,3), e3=(1,3):
+spanning_tree([e1,e2,e3], vertices) → [e1, e2]  (oder ähnlich, n-1=2 Kanten)
 """
-
 function spanning_tree(edges::Vector{Edge}, vertices::Vector{Vertex})::Vector{Edge}
     idx = Dict(v.id => i for (i, v) in enumerate(vertices))
     uf = UnionFind(length(vertices))
@@ -153,24 +200,34 @@ function spanning_tree(edges::Vector{Edge}, vertices::Vector{Vertex})::Vector{Ed
 end
 
 """
-    fundamental_cycle(chord, tree)
- 
-Computes FC(chord, tree): the set of edges forming the unique cycle
-in tree u {chord}.
- 
-This is found by running BFS from chord.u to chord.v inside `tree`,
-then adding `chord` itself to close the cycle.
- 
-Arguments
----------
-- `chord` : the chord edge (not in `tree`).
-- `tree`  : a spanning tree as a Set{Edge}.
- 
-Returns
--------
-A Set{Edge} containing the edges of the fundamental cycle.
-"""
+    fundamental_cycle(chord, T)
 
+Berechnet FC(chord, T): die Menge der Kanten, die den eindeutigen Kreis
+in T ∪ {chord} bilden.
+
+Rolle
+-----
+Kernfunktion des Kishi-Kajitani-Algorithmus. Da T ein Spannbaum ist,
+gibt es zwischen chord.u und chord.v genau einen Weg in T. Fügt man
+chord hinzu, entsteht genau ein Kreis. Diese Funktion findet diesen
+Kreis durch BFS und gibt alle beteiligten Kanten zurück.
+
+Argumente
+---------
+- `chord` : eine Sehne (Kante, die nicht in T liegt).
+- `T`     : ein Spannbaum als Vector{Edge}.
+
+Rückgabe
+--------
+Eine Set{Edge} mit den Kanten des Fundamentalkreises
+(inklusive chord selbst).
+
+Beispiel
+--------
+Baum T: s --e1-- a --e2-- t
+Sehne chord = e3 = (s, t)
+→ fundamental_cycle(e3, T) = {e1, e2, e3}
+"""
 function fundamental_cycle(chord::Edge, T::Vector{Edge})::Set{Edge}
     path = bfs_path(chord.u.id, chord.v.id, T)
     cycle = Set(path)
@@ -179,99 +236,149 @@ function fundamental_cycle(chord::Edge, T::Vector{Edge})::Set{Edge}
 end
 
 # ==============================================================================
-# Kishi-Kajitani: two maximally distant spanning trees
+# Kishi-Kajitani: zwei maximal distante Spannbäume
 # ==============================================================================
-# Goal: find two spanning trees T1 and T2 of G' such that their NEUTRAL
-# edges are disjoint. We do this by making T1 and T2 "maximally distant",
-# meaning no swap can increase |T1 \ T2| any further.
+# Ziel: zwei Spannbäume T1 und T2 von G' finden, deren NEUTRALE Kanten
+# disjunkt sind. Dies erreichen wir, indem T1 und T2 "maximal distant"
+# gemacht werden, d.h. kein Tausch kann |T1 \ T2| weiter erhöhen.
 #
-# Key definitions from PDF
-#   - A "chord" of tree T is an edge in G' that is NOT in T.
-#   - A "common chord" is an edge that is a chord of BOTH T1 and T2
-#     (i.e. it belongs to neither tree).
-#   - The "fundamental cycle" FC(e, T) of a chord e w.r.t. tree T is
-#     the set of edges forming the unique cycle in T u {e}.
-#     In practice: it is the path from e.u to e.v inside T, plus e itself.
+# Schlüsselbegriffe aus dem PDF:
+#   - Eine "Sehne" von T ist eine Kante in G', die NICHT in T liegt.
+#   - Eine "gemeinsame Sehne" liegt weder in T1 noch in T2.
+#   - Der Fundamentalkreis FC(e, T) einer Sehne e bezüglich T ist
+#     die Menge der Kanten, die den eindeutigen Kreis in T ∪ {e} bilden.
 #
-# Algorithm 3 (Kishi-Kajitani):
-#   Repeat until no common chord can improve the distance:
-#     For each common chord e, try to augment (swap edges to increase distance).
+# Algorithmus 3 (Kishi-Kajitani):
+#   Wiederholen bis keine gemeinsame Sehne die Distanz verbessern kann:
+#     Für jede gemeinsame Sehne e, Augmentierung versuchen.
 #
-# Algorithm 4 (Augment):
-#   Build layers L starting from FC(e, T1).
-#   Alternate between T1 and T2 to extend the layers.
-#   If a layer intersects the "other" tree → perform the swap (chain exchange).
- 
-function augment!(T1::Vector{Edge}, T2::Vector{Edge}, e::Edge)::Bool
-    par = Dict{Int, Int}()
+# Algorithmus 4 (Augment):
+#   F = Front (nur neu erreichte Kanten der aktuellen Schicht)
+#   V = alle bisher besuchten Kanten
+#   Schichten F aufbauen, beginnend mit FC(e, T1).
+#   Abwechselnd zwischen T1 und T2 wechseln.
+#   Falls F eine Kante aus dem anderen Baum enthält → Tausch durchführen.
 
-    L = fundamental_cycle(e, T1)
-    delete!(L, e)
-    Lprev = Set{Edge}()
+"""
+    augment!(T1, T2, e)
+
+Algorithmus 4 aus dem PDF: versucht d(T1, T2) = |T1 \\ T2| um 1 zu erhöhen,
+indem die gemeinsame Sehne `e` (weder in T1 noch in T2) verwendet wird.
+
+Rolle
+-----
+Kernstück des Kishi-Kajitani-Algorithmus. Baut schichtweise eine Front F auf,
+beginnend mit FC(e, T1). Wechselt dabei abwechselnd zwischen T1 und T2.
+Wichtig: nur die aktuelle Front F wird gegen den alternierenden Baum getestet,
+nicht alle bisher besuchten Kanten V — sonst würden veraltete Kanten
+fälschlicherweise einen Tausch auslösen (siehe PDF, Anhang A).
+Falls F eine Kante f ∈ T1 ∩ T2 erreicht, wird die Tauschkette rekonstruiert
+und der Tausch in-place durchgeführt.
+
+Argumente
+---------
+- `T1`, `T2` : die zwei Spannbäume (werden bei Erfolg in-place verändert).
+- `e`        : eine gemeinsame Sehne (in G', weder in T1 noch in T2).
+
+Rückgabe
+--------
+`true` falls ein Tausch durchgeführt wurde, `false` sonst.
+
+Beispiel
+--------
+T1 = {e1, e2}, T2 = {e1, e3}, gemeinsame Sehne e = e4
+→ augment! findet eine Tauschkette und gibt true zurück.
+→ T1 und T2 haben danach eine Kante mehr unterschiedlich.
+"""
+function augment!(T1::Vector{Edge}, T2::Vector{Edge}, e::Edge)::Bool
+    par = Dict{Edge, Edge}()
+
+    # F = Front (nur neu erreichte Kanten der aktuellen Schicht)
+    # V = alle bisher besuchten Kanten
+    F = fundamental_cycle(e, T1)
+    delete!(F, e)
+    V = copy(F)
     k = 1
 
-    while L != Lprev
-        Lprev = copy(L)
+    while !isempty(F)
         Talt = isodd(k) ? T2 : T1
 
-        inter = [x for x in L if x in Talt]
+        # Nur die aktuelle Front F gegen Talt testen, nicht alle von V
+        inter = [x for x in F if x in Talt]
+
         if !isempty(inter)
             f = first(inter)
-            chain = [f]
-            x = f
-            while haskey(par, x.id)
-                pid = par[x.id]
-                px = nothing
-                for z in Lprev
-                    if z.id == pid
-                        px = z
-                        break
-                    end
-                end
-                px === nothing && break
-                x = px
-                pushfirst!(chain, x)
+            chain = Edge[f]
+            cur = f
+            while haskey(par, cur)
+                cur = par[cur]
+                pushfirst!(chain, cur)
             end
 
-            newT1 = copy(T1)
-            newT2 = copy(T2)
-
-            deleteat!(newT1, findall(x -> x.id == e.id, newT1))
-            push!(newT1, e)
-
+            push!(T1, e)
             for (i, c) in enumerate(chain)
                 if isodd(i)
-                    deleteat!(newT1, findall(x -> x.id == c.id, newT1))
-                    push!(newT2, c)
+                    filter!(x -> x.id != c.id, T1)
+                    push!(T2, c)
                 else
-                    deleteat!(newT2, findall(x -> x.id == c.id, newT2))
-                    push!(newT1, c)
+                    push!(T1, c)
+                    filter!(x -> x.id != c.id, T2)
                 end
             end
-
-            empty!(T1); append!(T1, newT1)
-            empty!(T2); append!(T2, newT2)
             return true
         end
 
-        newL = copy(L)
-        for g in L
+        # Nächste Front F' aus Fundamentalkreisen der Kanten in F aufbauen,
+        # nur Kanten hinzufügen, die noch nicht in V enthalten sind
+        F_next = Set{Edge}()
+        for g in F
             for f in fundamental_cycle(g, Talt)
-                if !(f in L)
-                    push!(newL, f)
-                    haskey(par, f.id) || (par[f.id] = g.id)
+                if f ∉ V
+                    push!(F_next, f)
+                    push!(V, f)
+                    haskey(par, f) || (par[f] = g)
                 end
             end
         end
-        L = newL
+        F = F_next
         k += 1
     end
 
     false
 end
 
+"""
+    maximally_distant_trees(gprime, vertices)
+
+Algorithmus 3 aus dem PDF: berechnet zwei maximal distante Spannbäume
+T1 und T2 von G' mittels Kishi-Kajitani.
+
+Rolle
+-----
+Liefert At und Bt für short_strategy. Falls G' zwei kantendisjunkte
+Spannbäume besitzt, sind At und Bt nach Abschluss kantendisjunkt —
+insbesondere disjunkt in den neutralen Kanten, was Short's Invariante
+garantiert. Startet mit zwei verschiedenen Anfangsbäumen (einmal
+gprime vorwärts, einmal rückwärts), um Kishi-Kajitani einen besseren
+Ausgangspunkt zu geben.
+
+Argumente
+---------
+- `gprime`   : Kanten von G' (neutral + Short-beansprucht).
+- `vertices` : alle Knoten des Spielgraphen.
+
+Rückgabe
+--------
+Ein Tupel (T1, T2), jeweils ein Vector{Edge}.
+
+Beispiel
+--------
+G' hat 5 Knoten und 8 Kanten (genug für 2 Spannbäume):
+→ maximally_distant_trees gibt (At, Bt) zurück mit |At ∩ Bt neutralen Kanten| = 0,
+  falls Short eine Gewinnstrategie hat.
+"""
 function maximally_distant_trees(gprime::Vector{Edge}, vertices::Vector{Vertex})
-    T1 = spanning_treer(gprime, vertices)
+    T1 = spanning_tree(gprime, vertices)
     T2 = spanning_tree(reverse(gprime), vertices)
 
     changed = true
@@ -290,9 +397,33 @@ function maximally_distant_trees(gprime::Vector{Edge}, vertices::Vector{Vertex})
 end
 
 # =========================
-# Short strategy
+# Shorts Strategie
 # =========================
 
+"""
+    last_cut_edge(state)
+
+Gibt die zuletzt von Cut entfernte Kante zurück, oder `nothing`
+falls Cut noch keinen Zug gemacht hat.
+
+Rolle
+-----
+Wird in short_strategy verwendet, um die Kante `a` zu bestimmen,
+auf die Short reagieren muss (Reparaturstrategie).
+
+Argumente
+---------
+- `state` : aktueller Spielzustand.
+
+Rückgabe
+--------
+Die letzte von Cut gespielte Edge, oder `nothing`.
+
+Beispiel
+--------
+history = [(:short, e1), (:cut, e2), (:short, e3), (:cut, e4)]
+→ last_cut_edge gibt e4 zurück.
+"""
 function last_cut_edge(state::GameState)
     for i = length(state.history):-1:1
         p, e = state.history[i]
@@ -303,6 +434,36 @@ function last_cut_edge(state::GameState)
     nothing
 end
 
+"""
+    cut_partition(tree, a, all_vertices, s)
+
+Entfernt Kante `a` aus `tree` und bestimmt die zwei entstehenden
+Zusammenhangskomponenten Cs (enthält s) und Ct (enthält t).
+
+Rolle
+-----
+Nach dem Entfernen einer Kante `a` aus einem Spannbaum zerfällt
+dieser in genau zwei Teilbäume. Diese Funktion bestimmt, welche
+Knoten auf der s-Seite und welche auf der t-Seite liegen.
+Das Ergebnis wird in `crossing_edge` verwendet, um eine Brückenkante
+im anderen Baum zu finden.
+
+Argumente
+---------
+- `tree`         : der Spannbaum (At oder Bt).
+- `a`            : die zu entfernende Kante.
+- `all_vertices` : alle Knoten des Graphen (damit keine Knoten verloren gehen).
+- `s`            : ID des Quellknotens.
+
+Rückgabe
+--------
+Ein Tupel (Cs, Ct) mit je einer Set{Int} der Knoten-IDs.
+
+Beispiel
+--------
+Baum At: s --e1-- a --e2-- t, Kante e1 entfernt.
+cut_partition(At, e1, vertices, s.id) → ({s.id}, {a.id, t.id})
+"""
 function cut_partition(tree::Vector{Edge}, a::Edge, all_vertices::Vector{Vertex}, s::Int)
     tree_wo = [e for e in tree if e.id != a.id]
     Cs = reachable_vertices(s, tree_wo)
@@ -310,6 +471,33 @@ function cut_partition(tree::Vector{Edge}, a::Edge, all_vertices::Vector{Vertex}
     Cs, Ct
 end
 
+"""
+    crossing_edge(tree, Cs, Ct)
+
+Sucht die erste neutrale Kante in `tree`, die den Cs-Ct-Schnitt überquert.
+
+Rolle
+-----
+Nach der Aufteilung in Cs und Ct durch `cut_partition` sucht diese
+Funktion im anderen Baum (Bt wenn At gerissen wurde, At wenn Bt gerissen)
+eine neutrale Kante, die die zwei Komponenten wieder verbindet.
+Diese Kante ist Short's nächster Zug (Reparatur der Invariante).
+
+Argumente
+---------
+- `tree` : der andere Spannbaum (Bt oder At).
+- `Cs`   : Knoten-IDs der s-Komponente.
+- `Ct`   : Knoten-IDs der t-Komponente.
+
+Rückgabe
+--------
+Die erste neutrale Kante, die Cs und Ct verbindet, oder `nothing`.
+
+Beispiel
+--------
+Bt = {e3=(s,b), e4=(b,t)}, Cs={s}, Ct={a,t}
+→ crossing_edge gibt e3 zurück (s ∈ Cs, b ∈ Ct).
+"""
 function crossing_edge(tree::Vector{Edge}, Cs::Set{Int}, Ct::Set{Int})
     for e in tree
         if e.state == :neutral
@@ -321,6 +509,53 @@ function crossing_edge(tree::Vector{Edge}, Cs::Set{Int}, Ct::Set{Int})
     nothing
 end
 
+"""
+    short_strategy(state)
+
+Berechnet Shorts optimalen Zug im ungewichteten Shannon-Switching-Spiel.
+
+Rolle
+-----
+Hauptfunktion der optimalen Strategie für Short. Short hält zwei Spannbäume
+At und Bt aufrecht, deren neutrale Kanten disjunkt sind. Nach jedem Cut-Zug
+wird einer der Bäume "repariert": die gerissene Kante wird durch eine
+Kante aus dem anderen Baum ersetzt, die den entstandenen Schnitt überbrückt.
+Solange diese Invariante aufrechterhalten werden kann, hat Short eine
+Gewinnstrategie.
+
+Implementiert Algorithmus 1 aus dem PDF:
+
+  1. G' aufbauen (neutrale + Short-beanspruchte Kanten).
+  2. At und Bt berechnen (Kishi-Kajitani): zwei Spannbäume mit
+     disjunkten neutralen Kanten.
+  3. Letzte von Cut entfernte Kante `a` bestimmen.
+     Beim ersten Zug gibt es noch keinen Cut-Zug: das PDF sagt,
+     eine virtuelle Kante a* = (s,t) zu simulieren, die weder in At
+     noch in Bt liegt → Fallback (neutrale Kante auf einem s-t-Weg).
+  4. Reparaturstrategie:
+     - a ∈ At → At − {a} in Cs und Ct aufteilen, neutrale Kante in Bt
+               suchen, die den Schnitt überquert.
+     - a ∈ Bt → symmetrisch.
+     - sonst  → beliebige neutrale Kante auf einem s-t-Weg in G'.
+
+Falls Short keine Gewinnstrategie hat (z.B. zu wenig Kanten in G'),
+wird ein beliebiger gültiger Zug zurückgegeben.
+
+Argumente
+---------
+- `state` : aktueller Spielzustand.
+
+Rückgabe
+--------
+Die Edge, die Short als nächstes beanspruchen soll.
+
+Beispiel
+--------
+G' hat zwei disjunkte Spannbäume At und Bt.
+Cut hat zuletzt e2 ∈ At entfernt.
+→ short_strategy findet eine neutrale Kante in Bt, die At repariert,
+  und gibt diese zurück.
+"""
 function short_strategy(state::GameState)::Edge
     moves = valid_moves(state)
     isempty(moves) && return state.graph.edges[1]
@@ -348,7 +583,8 @@ function short_strategy(state::GameState)::Edge
 
     a = last_cut_edge(state)
     if a === nothing
-        a = Edge(-1, g.s, g.t, 0.0, :cut)  # virtual edge for first move
+        # Erster Zug: virtuelle Kante a* = (s,t) simulieren (liegt in keinem Baum)
+        a = Edge(-1, g.s, g.t, 0.0, :cut)
     end
 
     if a in At
